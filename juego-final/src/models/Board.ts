@@ -44,7 +44,6 @@ export class Board {
             p.setPosition(newX, newY);
             this.grid[newY][newX] = p;
         } else if (objective.type !== "Obstacle" && objective.type !== p.type) {
-            // --- SONIDO DE GOLPE CUANDO CHOCAN ---
             audioManager.playHit();
 
             const dmg1 = Math.floor(Math.random() * (p.attackPower - 5 + 1)) + 5;

@@ -39,6 +39,9 @@ export class HungerGames {
     private setupEntities(): void {
         this.hunters = [];
         this.preys = [];
+        
+        if (this.config.mode === 'sandbox') return;
+
         const hStrat = new HunterMove();
         const pStrat = new PreyMove();
 
@@ -48,7 +51,7 @@ export class HungerGames {
             this.hunters.push(h);
         }
         for (let i = 0; i < this.config.preys; i++) {
-            const strat = (this.config.mode === 'singleplayer' && i === 0) ? null : pStrat;
+            const strat = (i === 0) ? null : pStrat;
             const p = new Prey(`P${i}`, this.config.preyDmg, 0, 0, strat);
             this.randomPlace(p);
             this.preys.push(p);
@@ -74,6 +77,31 @@ export class HungerGames {
         }
     }
 
+    public addEntityManual(type: string, x: number, y: number): void {
+        if (x < 0 || x >= this.config.size || y < 0 || y >= this.config.size) return;
+        if (this.board.getGrid()[y][x] !== null) return;
+
+        if (type === 'Hunter') {
+            const h = new Hunter(`H${Date.now()}`, this.config.hunterDmg, x, y, new HunterMove());
+            this.hunters.push(h);
+            this.board.placePlayer(h);
+        } else if (type === 'Prey') {
+            const p = new Prey(`P${Date.now()}`, this.config.preyDmg, x, y, new PreyMove());
+            this.preys.push(p);
+            this.board.placePlayer(p);
+        } else if (type === 'Obstacle') {
+            const o = new Obstacle(`O${Date.now()}`, x, y);
+            this.board.placePlayer(o);
+        }
+        
+        audioManager.playClick();
+        this.board.drawBoard([], null);
+    }
+
+    public drawInitialBoard(): void {
+        this.board.drawBoard([], null);
+    }
+
     private isAlive(p: Player): boolean {
         const grid = this.board.getGrid();
         return p.y >= 0 && p.y < this.config.size && p.x >= 0 && p.x < this.config.size && grid[p.y][p.x] === p;
@@ -81,7 +109,6 @@ export class HungerGames {
 
     public handleInput(key: string): void {
         if (this.config.mode !== 'singleplayer') return;
-        
         const user = this.preys[0];
         if (!user || !this.isAlive(user)) return;
 
@@ -104,10 +131,7 @@ export class HungerGames {
 
         if (shootDx !== 0 || shootDy !== 0) {
             audioManager.playShoot();
-            this.projectiles.push({
-                x: user.x, y: user.y,
-                dx: shootDx * 0.3, dy: shootDy * 0.3 
-            });
+            this.projectiles.push({ x: user.x, y: user.y, dx: shootDx * 0.3, dy: shootDy * 0.3 });
         }
     }
 
@@ -116,7 +140,7 @@ export class HungerGames {
         
         this.gameInterval = setInterval(() => {
             this.hunters.forEach(h => { if (this.isAlive(h)) h.performMove(this.board); });
-            this.preys.forEach((p) => { 
+            this.preys.forEach((p, i) => { 
                 if (this.isAlive(p) && p.strategy) p.performMove(this.board); 
             });
             this.checkWinCondition();
@@ -156,7 +180,6 @@ export class HungerGames {
 
             const playerChar = (this.config.mode === 'singleplayer' ? this.preys[0] : null);
             this.board.drawBoard(this.projectiles, playerChar); 
-            
         }, 16); 
     }
 
@@ -164,7 +187,7 @@ export class HungerGames {
         const hAlive = this.hunters.filter(h => this.isAlive(h)).length;
         const pAlive = this.preys.filter(p => this.isAlive(p)).length;
 
-        if (hAlive === 0 || pAlive === 0) {
+        if (this.hunters.length > 0 && this.preys.length > 0 && (hAlive === 0 || pAlive === 0)) {
             this.stop();
             const playerChar = (this.config.mode === 'singleplayer' ? this.preys[0] : null);
             this.board.drawBoard(this.projectiles, playerChar);
@@ -172,9 +195,7 @@ export class HungerGames {
             const playerWon = hAlive === 0;
             const msg = playerWon ? "¡VICTORIA DE LAS PRESAS!" : "¡LOS CAZADORES GANAN!";
             
-            window.dispatchEvent(new CustomEvent('game-over', { 
-                detail: { msg: msg, win: playerWon } 
-            }));
+            window.dispatchEvent(new CustomEvent('game-over', { detail: { msg: msg, win: playerWon } }));
         }
     }
 
@@ -183,13 +204,5 @@ export class HungerGames {
         if (this.projInterval) clearInterval(this.projInterval);
         this.gameInterval = null;
         this.projInterval = null;
-    }
-
-    public reset(): void {
-        this.stop();
-        this.projectiles = [];
-        this.board = new Board(this.config.size, this.config.size, this.canvasId);
-        this.setupEntities();
-        this.board.drawBoard([], null);
     }
 }
