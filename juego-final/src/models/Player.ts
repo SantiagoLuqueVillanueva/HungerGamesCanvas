@@ -9,6 +9,10 @@ export abstract class Player {
     public attackPower: number;
     public x: number;
     public y: number;
+    
+    public visualX: number;
+    public visualY: number;
+    
     public strategy: MoveStrategy | null;
 
     constructor(name: string, type: string, vitality: number, attackPower: number, x: number, y: number, strategy: MoveStrategy | null) {
@@ -19,6 +23,8 @@ export abstract class Player {
         this.attackPower = attackPower;
         this.x = x;
         this.y = y;
+        this.visualX = x;
+        this.visualY = y;
         this.strategy = strategy;
     }
 

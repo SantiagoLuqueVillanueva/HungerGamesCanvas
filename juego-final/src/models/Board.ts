@@ -1,4 +1,5 @@
 import type { Player } from "./Player";
+import { audioManager } from "../AudioManager";
 
 export class Board {
     private grid: (Player | null)[][];
@@ -17,20 +18,11 @@ export class Board {
         this.ctx = this.canvas.getContext("2d")!;
         this.cellSize = this.canvas.width / this.width;
 
-        this.sprites.hunter = new Image();
-        this.sprites.hunter.src = "/assets/hunter.png"; 
-
-        this.sprites.prey = new Image();
-        this.sprites.prey.src = "/assets/prey.png";
-
-        this.sprites.player = new Image();
-        this.sprites.player.src = "/assets/player.png";
-
-        this.sprites.obstacle = new Image();
-        this.sprites.obstacle.src = "/assets/rock.png";
-
-        this.sprites.grass = new Image();
-        this.sprites.grass.src = "/assets/grass.png";
+        this.sprites.hunter = new Image(); this.sprites.hunter.src = "/assets/hunter.png"; 
+        this.sprites.prey = new Image(); this.sprites.prey.src = "/assets/prey.png";
+        this.sprites.player = new Image(); this.sprites.player.src = "/assets/player.png";
+        this.sprites.obstacle = new Image(); this.sprites.obstacle.src = "/assets/rock.png";
+        this.sprites.grass = new Image(); this.sprites.grass.src = "/assets/grass.png";
     }
 
     public getGrid(): (Player | null)[][] { return this.grid; }
@@ -39,6 +31,8 @@ export class Board {
 
     public placePlayer(p: Player): void {
         this.grid[p.y][p.x] = p;
+        p.visualX = p.x;
+        p.visualY = p.y;
     }
 
     public movePlayer(p: Player, newX: number, newY: number): void {
@@ -50,6 +44,9 @@ export class Board {
             p.setPosition(newX, newY);
             this.grid[newY][newX] = p;
         } else if (objective.type !== "Obstacle" && objective.type !== p.type) {
+            // --- SONIDO DE GOLPE CUANDO CHOCAN ---
+            audioManager.playHit();
+
             const dmg1 = Math.floor(Math.random() * (p.attackPower - 5 + 1)) + 5;
             const dmg2 = Math.floor(Math.random() * (objective.attackPower - 5 + 1)) + 5;
             objective.takeDamage(dmg1);
@@ -81,8 +78,11 @@ export class Board {
                 const p = this.grid[y][x];
                 if (!p) continue;
 
-                const drawX = x * this.cellSize;
-                const drawY = y * this.cellSize;
+                p.visualX += (p.x - p.visualX) * 0.3;
+                p.visualY += (p.y - p.visualY) * 0.3;
+
+                const drawX = p.visualX * this.cellSize;
+                const drawY = p.visualY * this.cellSize;
 
                 let img = null;
                 if (p.type === "Obstacle") {
@@ -90,18 +90,11 @@ export class Board {
                 } else if (p.type === "Hunter") {
                     img = this.sprites.hunter;
                 } else if (p.type === "Prey") {
-                    
                     if (playerCharacter && p === playerCharacter) {
-                        this.ctx.fillStyle = "rgba(255, 255, 0, 0.8)";
+                        this.ctx.fillStyle = "rgba(255, 255, 0, 0.8)"; 
                         this.ctx.beginPath();
-                        this.ctx.arc(
-                            drawX + this.cellSize / 2, 
-                            drawY + this.cellSize / 2, 
-                            this.cellSize / 1.5,
-                            0, Math.PI * 2
-                        );
+                        this.ctx.arc(drawX + this.cellSize / 2, drawY + this.cellSize / 2, this.cellSize / 1.5, 0, Math.PI * 2);
                         this.ctx.fill();
-                        
                         img = this.sprites.player;
                     } else {
                         img = this.sprites.prey;

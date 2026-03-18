@@ -1,4 +1,5 @@
 import { HungerGames, type GameConfig } from "./HungerGames";
+import { audioManager } from "./AudioManager"; // <-- IMPORTAMOS EL AUDIO
 
 window.onload = () => {
     let game: HungerGames | null = null;
@@ -17,7 +18,17 @@ window.onload = () => {
     const startBtn = document.getElementById('start-btn') as HTMLButtonElement;
     const resetBtn = document.getElementById('reset-btn') as HTMLButtonElement;
 
+    // --- ACTIVAR MÚSICA DEL MENÚ AL PRIMER CLIC EN CUALQUIER PARTE ---
+    // (Esto evita bloqueos del navegador por autoplay)
+    document.body.addEventListener('click', () => {
+        if (menu.classList.contains('hidden') === false) {
+            audioManager.playMenuBgm();
+        }
+    }, { once: true });
+
+    // --- PANEL DE INSTRUCCIONES ---
     btnInfo.onclick = () => {
+        audioManager.playClick();
         modeSelector.classList.add('hidden');
         btnInfo.classList.add('hidden');
         infoPanel.classList.remove('hidden');
@@ -25,13 +36,16 @@ window.onload = () => {
     };
 
     btnCloseInfo.onclick = () => {
+        audioManager.playClick();
         infoPanel.classList.add('hidden');
         modeSelector.classList.remove('hidden');
         btnInfo.classList.remove('hidden');
         menuTitle.innerText = "Elige un Modo de Juego";
     };
 
+    // --- SELECCIÓN DE MODO ---
     btnSandbox.onclick = () => {
+        audioManager.playClick();
         selectedMode = 'sandbox';
         modeSelector.classList.add('hidden');
         btnInfo.classList.add('hidden');
@@ -40,6 +54,7 @@ window.onload = () => {
     };
 
     btnSingle.onclick = () => {
+        audioManager.playClick();
         selectedMode = 'singleplayer';
         modeSelector.classList.add('hidden');
         btnInfo.classList.add('hidden');
@@ -59,8 +74,15 @@ window.onload = () => {
         };
     };
 
+    // --- INICIAR PARTIDA ---
     startBtn.onclick = () => {
+        audioManager.playClick();
         const config = getConfigFromUI();
+        
+        // Elegimos la música de batalla según el modo
+        if (config.mode === 'sandbox') audioManager.playSandboxBgm();
+        else audioManager.playActionBgm();
+
         if (game) game.stop();
         game = new HungerGames(config, "gameCanvas");
         
@@ -69,7 +91,11 @@ window.onload = () => {
         game.start();
     };
 
+    // --- VOLVER AL MENÚ ---
     resetBtn.onclick = () => {
+        audioManager.playClick();
+        audioManager.playMenuBgm(); // Volvemos a la música tranquila
+        
         if (game) game.stop();
         menu.classList.remove('hidden');
         resetBtn.classList.add('hidden');
@@ -80,16 +106,27 @@ window.onload = () => {
         menuTitle.innerText = "Elige un Modo de Juego";
     };
 
+    // --- FIN DE PARTIDA ---
     window.addEventListener('game-over', (e: any) => {
+        audioManager.stopBgm(); // Paramos la música de batalla
+        
+        // Reproducimos victoria o derrota según el evento
+        if (e.detail.win) {
+            audioManager.playWin();
+        } else {
+            audioManager.playLose();
+        }
+
         menu.classList.remove('hidden');
         resetBtn.classList.add('hidden');
         configPanel.classList.add('hidden');
         infoPanel.classList.add('hidden');
         modeSelector.classList.remove('hidden');
         btnInfo.classList.remove('hidden');
-        menuTitle.innerText = e.detail;
+        menuTitle.innerText = e.detail.msg; // El mensaje ("Victoria" o "Derrota")
     });
 
+    // --- CONTROLES ---
     document.addEventListener('keydown', (e) => {
         if (game && menu.classList.contains('hidden')) {
             game.handleInput(e.key);

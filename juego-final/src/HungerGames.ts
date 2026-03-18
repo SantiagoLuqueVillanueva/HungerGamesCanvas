@@ -5,6 +5,7 @@ import { Obstacle } from "./models/Obstacle";
 import { HunterMove } from "./strategys/HunterMove";
 import { PreyMove } from "./strategys/PreyMove";
 import type { Player } from "./models/Player";
+import { audioManager } from "./AudioManager";
 
 export interface GameConfig {
     mode: 'sandbox' | 'singleplayer';
@@ -102,9 +103,10 @@ export class HungerGames {
         if (key === 'ArrowRight') shootDx = 1;
 
         if (shootDx !== 0 || shootDy !== 0) {
+            audioManager.playShoot();
             this.projectiles.push({
                 x: user.x, y: user.y,
-                dx: shootDx, dy: shootDy
+                dx: shootDx * 0.3, dy: shootDy * 0.3 
             });
         }
     }
@@ -114,10 +116,9 @@ export class HungerGames {
         
         this.gameInterval = setInterval(() => {
             this.hunters.forEach(h => { if (this.isAlive(h)) h.performMove(this.board); });
-            this.preys.forEach((p, i) => { 
+            this.preys.forEach((p) => { 
                 if (this.isAlive(p) && p.strategy) p.performMove(this.board); 
             });
-
             this.checkWinCondition();
         }, 400);
 
@@ -133,9 +134,13 @@ export class HungerGames {
                         continue;
                     }
 
-                    const cell = this.board.getGrid()[proj.y][proj.x];
+                    const gridX = Math.floor(proj.x);
+                    const gridY = Math.floor(proj.y);
+                    const cell = this.board.getGrid()[gridY][gridX];
+                    
                     if (cell) {
                         if (cell.type === 'Hunter') {
+                            audioManager.playHit();
                             cell.takeDamage(this.config.preyDmg);
                             if (cell.vitality <= 0 && this.board.getGrid()[cell.y][cell.x] === cell) {
                                 this.board.getGrid()[cell.y][cell.x] = null;
@@ -152,7 +157,7 @@ export class HungerGames {
             const playerChar = (this.config.mode === 'singleplayer' ? this.preys[0] : null);
             this.board.drawBoard(this.projectiles, playerChar); 
             
-        }, 50);
+        }, 16); 
     }
 
     private checkWinCondition() {
@@ -163,8 +168,13 @@ export class HungerGames {
             this.stop();
             const playerChar = (this.config.mode === 'singleplayer' ? this.preys[0] : null);
             this.board.drawBoard(this.projectiles, playerChar);
-            const msg = hAlive === 0 ? "¡VICTORIA DE LAS PRESAS!" : "¡LOS CAZADORES GANAN!";
-            window.dispatchEvent(new CustomEvent('game-over', { detail: msg }));
+            
+            const playerWon = hAlive === 0;
+            const msg = playerWon ? "¡VICTORIA DE LAS PRESAS!" : "¡LOS CAZADORES GANAN!";
+            
+            window.dispatchEvent(new CustomEvent('game-over', { 
+                detail: { msg: msg, win: playerWon } 
+            }));
         }
     }
 
