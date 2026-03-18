@@ -6,25 +6,34 @@ import { HunterMove } from "./strategys/HunterMove";
 import { PreyMove } from "./strategys/PreyMove";
 import type { Player } from "./models/Player";
 
+export interface GameConfig {
+    mode: 'sandbox' | 'singleplayer';
+    hunters: number;
+    hunterDmg: number;
+    preys: number;
+    preyDmg: number;
+    obstacles: number;
+    size: number;
+}
+
+export interface Projectile { x: number; y: number; dx: number; dy: number; }
+
 export class HungerGames {
     private board: Board;
     private hunters: Player[] = [];
     private preys: Player[] = [];
+    private projectiles: Projectile[] = [];
     private gameInterval: any = null;
+    private projInterval: any = null;
     private canvasId: string;
-    private config: { h: number, p: number, o: number };
+    public config: GameConfig;
 
-    constructor(huntersCount: number, preysCount: number, obstaclesCount: number, canvasId: string) {
-    this.canvasId = canvasId;
-    this.config = { h: huntersCount, p: preysCount, o: obstaclesCount };
-    
-    const canvas = document.getElementById(canvasId) as HTMLCanvasElement;
-    canvas.width = 800;
-    canvas.height = 800;
-
-    this.board = new Board(20, 20, canvasId); 
-    this.setupEntities();
-}
+    constructor(config: GameConfig, canvasId: string) {
+        this.canvasId = canvasId;
+        this.config = config;
+        this.board = new Board(config.size, config.size, canvasId);
+        this.setupEntities();
+    }
 
     private setupEntities(): void {
         this.hunters = [];
@@ -32,17 +41,18 @@ export class HungerGames {
         const hStrat = new HunterMove();
         const pStrat = new PreyMove();
 
-        for (let i = 0; i < this.config.h; i++) {
-            const h = new Hunter(`H${i}`, 0, 0, hStrat);
+        for (let i = 0; i < this.config.hunters; i++) {
+            const h = new Hunter(`H${i}`, this.config.hunterDmg, 0, 0, hStrat);
             this.randomPlace(h);
             this.hunters.push(h);
         }
-        for (let i = 0; i < this.config.p; i++) {
-            const p = new Prey(`P${i}`, 0, 0, pStrat);
+        for (let i = 0; i < this.config.preys; i++) {
+            const strat = (this.config.mode === 'singleplayer' && i === 0) ? null : pStrat;
+            const p = new Prey(`P${i}`, this.config.preyDmg, 0, 0, strat);
             this.randomPlace(p);
             this.preys.push(p);
         }
-        for (let i = 0; i < this.config.o; i++) {
+        for (let i = 0; i < this.config.obstacles; i++) {
             this.randomPlace(new Obstacle(`Obs${i}`, 0, 0));
         }
     }
@@ -51,9 +61,9 @@ export class HungerGames {
         let placed = false;
         const grid = this.board.getGrid();
         let attempts = 0;
-        while (!placed && attempts < 400) {
-            const x = Math.floor(Math.random() * 20);
-            const y = Math.floor(Math.random() * 20);
+        while (!placed && attempts < 1000) {
+            const x = Math.floor(Math.random() * this.config.size);
+            const y = Math.floor(Math.random() * this.config.size);
             if (grid[y][x] === null) {
                 p.x = x; p.y = y;
                 this.board.placePlayer(p);
@@ -65,39 +75,111 @@ export class HungerGames {
 
     private isAlive(p: Player): boolean {
         const grid = this.board.getGrid();
-        return p.y >= 0 && p.y < 20 && p.x >= 0 && p.x < 20 && grid[p.y][p.x] === p;
+        return p.y >= 0 && p.y < this.config.size && p.x >= 0 && p.x < this.config.size && grid[p.y][p.x] === p;
+    }
+
+    public handleInput(key: string): void {
+        if (this.config.mode !== 'singleplayer') return;
+        
+        const user = this.preys[0];
+        if (!user || !this.isAlive(user)) return;
+
+        let moveDx = 0, moveDy = 0;
+        if (key === 'w' || key === 'W') moveDy = -1;
+        if (key === 's' || key === 'S') moveDy = 1;
+        if (key === 'a' || key === 'A') moveDx = -1;
+        if (key === 'd' || key === 'D') moveDx = 1;
+
+        if (moveDx !== 0 || moveDy !== 0) {
+            this.board.movePlayer(user, user.x + moveDx, user.y + moveDy);
+            return;
+        }
+
+        let shootDx = 0, shootDy = 0;
+        if (key === 'ArrowUp') shootDy = -1;
+        if (key === 'ArrowDown') shootDy = 1;
+        if (key === 'ArrowLeft') shootDx = -1;
+        if (key === 'ArrowRight') shootDx = 1;
+
+        if (shootDx !== 0 || shootDy !== 0) {
+            this.projectiles.push({
+                x: user.x, y: user.y,
+                dx: shootDx, dy: shootDy
+            });
+        }
     }
 
     public start(): void {
         this.stop();
+        
         this.gameInterval = setInterval(() => {
-            this.board.drawBoard();
             this.hunters.forEach(h => { if (this.isAlive(h)) h.performMove(this.board); });
-            this.preys.forEach(p => { if (this.isAlive(p)) p.performMove(this.board); });
+            this.preys.forEach((p, i) => { 
+                if (this.isAlive(p) && p.strategy) p.performMove(this.board); 
+            });
 
-            const hAlive = this.hunters.filter(h => this.isAlive(h)).length;
-            const pAlive = this.preys.filter(p => this.isAlive(p)).length;
-
-            if (hAlive === 0 || pAlive === 0) {
-                this.stop();
-                this.board.drawBoard();
-                const msg = hAlive === 0 ? "¡GANAN LAS PRESAS!" : "¡GANAN LOS CAZADORES!";
-                window.dispatchEvent(new CustomEvent('game-over', { detail: msg }));
-            }
+            this.checkWinCondition();
         }, 400);
+
+        this.projInterval = setInterval(() => {
+            if (this.projectiles.length > 0) {
+                for (let i = this.projectiles.length - 1; i >= 0; i--) {
+                    const proj = this.projectiles[i];
+                    proj.x += proj.dx;
+                    proj.y += proj.dy;
+
+                    if (proj.x < 0 || proj.x >= this.config.size || proj.y < 0 || proj.y >= this.config.size) {
+                        this.projectiles.splice(i, 1);
+                        continue;
+                    }
+
+                    const cell = this.board.getGrid()[proj.y][proj.x];
+                    if (cell) {
+                        if (cell.type === 'Hunter') {
+                            cell.takeDamage(this.config.preyDmg);
+                            if (cell.vitality <= 0 && this.board.getGrid()[cell.y][cell.x] === cell) {
+                                this.board.getGrid()[cell.y][cell.x] = null;
+                            }
+                        }
+                        if (cell.type !== 'Prey') {
+                            this.projectiles.splice(i, 1);
+                        }
+                    }
+                }
+                this.checkWinCondition();
+            }
+
+            const playerChar = (this.config.mode === 'singleplayer' ? this.preys[0] : null);
+            this.board.drawBoard(this.projectiles, playerChar); 
+            
+        }, 50);
+    }
+
+    private checkWinCondition() {
+        const hAlive = this.hunters.filter(h => this.isAlive(h)).length;
+        const pAlive = this.preys.filter(p => this.isAlive(p)).length;
+
+        if (hAlive === 0 || pAlive === 0) {
+            this.stop();
+            const playerChar = (this.config.mode === 'singleplayer' ? this.preys[0] : null);
+            this.board.drawBoard(this.projectiles, playerChar);
+            const msg = hAlive === 0 ? "¡VICTORIA DE LAS PRESAS!" : "¡LOS CAZADORES GANAN!";
+            window.dispatchEvent(new CustomEvent('game-over', { detail: msg }));
+        }
     }
 
     public stop(): void {
-        if (this.gameInterval) {
-            clearInterval(this.gameInterval);
-            this.gameInterval = null;
-        }
+        if (this.gameInterval) clearInterval(this.gameInterval);
+        if (this.projInterval) clearInterval(this.projInterval);
+        this.gameInterval = null;
+        this.projInterval = null;
     }
 
     public reset(): void {
         this.stop();
-        this.board = new Board(20, 20, this.canvasId);
+        this.projectiles = [];
+        this.board = new Board(this.config.size, this.config.size, this.canvasId);
         this.setupEntities();
-        this.board.drawBoard();
+        this.board.drawBoard([], null);
     }
 }
