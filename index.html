@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Hunger Games - Pro</title>
+    <style>
+        body { 
+            background: radial-gradient(circle, #1a2a3a 0%, #050505 100%); 
+            display: flex; flex-direction: column; align-items: center; justify-content: center; 
+            min-height: 100vh; margin: 0; color: white; font-family: 'Segoe UI', sans-serif; 
+            overflow-x: hidden;
+            padding: 20px; box-sizing: border-box;
+        }
+        
+        h1 { 
+            margin-bottom: 10px; text-transform: uppercase; letter-spacing: 8px; 
+            text-shadow: 0 0 15px rgba(46, 204, 113, 0.5); 
+            font-size: clamp(1.8rem, 4vw, 2.5rem); 
+            text-align: center;
+        }
+        
+        .layout-wrapper { 
+            display: flex; flex-wrap: wrap;
+            align-items: center; justify-content: center; gap: 20px; 
+            width: 100%; max-width: 1200px;
+        }
+        
+        #editor-palette { 
+            background: rgba(44, 62, 80, 0.95); padding: 15px; border-radius: 12px; 
+            border: 2px solid #3498db; display: flex; flex-direction: column; align-items: center; 
+            gap: 15px; box-shadow: 0 0 20px rgba(52, 152, 219, 0.3); 
+        }
+        #editor-palette h3 { margin: 0; color: #f1c40f; text-align: center; font-size: clamp(1rem, 2vw, 1.2rem); }
+        .palette-item { 
+            width: clamp(48px, 6vw, 64px); height: clamp(48px, 6vw, 64px); 
+            cursor: grab; transition: transform 0.2s; background: rgba(0,0,0,0.3); 
+            border-radius: 8px; padding: 5px; border: 2px solid transparent; 
+        }
+        .palette-item:hover { transform: scale(1.1); border-color: #2ecc71; }
+        .palette-item:active { cursor: grabbing; }
+
+        .game-container { 
+            position: relative; 
+            width: 100%; 
+            max-width: min(75vh, 800px); 
+            aspect-ratio: 1 / 1;
+            border: clamp(3px, 0.5vw, 6px) solid #34495e; border-radius: 12px; 
+            box-shadow: 0 0 60px rgba(0, 0, 0, 0.8), 0 0 20px rgba(46, 204, 113, 0.1); 
+            background-color: #2c3e50; 
+        }
+        canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+        
+        #menu-overlay { 
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(0, 0, 0, 0.85); display: flex; flex-direction: column; 
+            align-items: center; justify-content: center; z-index: 10; border-radius: 6px; 
+            padding: 15px; box-sizing: border-box; text-align: center;
+        }
+        .hidden { display: none !important; }
+        
+        .settings-grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); 
+            gap: 10px; margin: 15px 0; background: rgba(255, 255, 255, 0.05); 
+            padding: 15px; border-radius: 10px; width: 95%; max-width: 500px; 
+        }
+        .setting-item { display: flex; flex-direction: column; align-items: center; }
+        .setting-item label { font-size: clamp(12px, 1.5vw, 14px); color: #bdc3c7; margin-bottom: 5px; }
+        .setting-item input { 
+            width: 60px; padding: 6px; border-radius: 5px; border: none; 
+            background: #34495e; color: white; text-align: center; font-weight: bold; 
+            font-size: clamp(14px, 2vw, 16px); 
+        }
+        
+        button { 
+            padding: clamp(10px, 1.5vw, 15px) clamp(20px, 3vw, 40px); 
+            font-size: clamp(14px, 2vw, 20px); font-weight: bold; cursor: pointer; 
+            background: linear-gradient(145deg, #2ecc71, #27ae60); color: white; border: none; 
+            border-radius: 8px; margin: 5px; text-transform: uppercase; transition: all 0.2s; 
+        }
+        button:hover { transform: translateY(-3px); box-shadow: 0 8px 25px rgba(46, 204, 113, 0.4); }
+        button#reset-btn { background: linear-gradient(145deg, #e74c3c, #c0392b); margin-top: 20px; padding: 8px 20px; font-size: clamp(12px, 1.5vw, 16px); }
+        
+        .mode-buttons { display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; margin-bottom: 10px; }
+        .btn-mode { background: linear-gradient(145deg, #3498db, #2980b9); }
+
+        #info-panel { 
+            background: rgba(44, 62, 80, 0.95); padding: 20px; border-radius: 10px; 
+            max-width: 90%; border: 2px solid #3498db; 
+        }
+        #info-panel h3 { color: #f1c40f; margin-top: 0; margin-bottom: 10px; font-size: clamp(16px, 2vw, 22px); }
+        #info-panel p { margin-bottom: 15px; font-size: clamp(12px, 1.5vw, 16px); line-height: 1.4; }
+    </style>
+</head>
+<body>
+    <h1>Hunger Games</h1>
+    
+    <div class="layout-wrapper">
+        <div id="editor-palette" class="hidden">
+            <h3>EDITOR</h3>
+            <p style="font-size: 12px; text-align: center; margin-top: 0;">Arrastra al tablero</p>
+            <img src="/assets/hunter.png" class="palette-item" draggable="true" data-type="Hunter" title="Cazador">
+            <img src="/assets/prey.png" class="palette-item" draggable="true" data-type="Prey" title="Presa">
+            <img src="/assets/rock.png" class="palette-item" draggable="true" data-type="Obstacle" title="Obstáculo">
+            <button id="btn-start-sim" style="font-size: 14px; padding: 10px 20px; margin-top: 20px;">▶ INICIAR</button>
+        </div>
+
+        <div class="game-container">
+            <canvas id="gameCanvas" width="800" height="800"></canvas>
+            
+            <div id="menu-overlay">
+                <h2 id="menu-title">Elige un Modo de Juego</h2>
+                
+                <div id="mode-selector" class="mode-buttons">
+                    <button id="btn-sandbox" class="btn-mode">MODO SANDBOX</button>
+                    <button id="btn-single" class="btn-mode">SINGLEPLAYER</button>
+                </div>
+                <button id="btn-info" style="background: linear-gradient(145deg, #f39c12, #d35400);">CÓMO JUGAR</button>
+
+                <div id="info-panel" class="hidden">
+                    <h3>🤖 MODO SANDBOX</h3><p>Arrastra los elementos desde la paleta al tablero para crear tu propia batalla personalizada. Pulsa INICIAR y observa la IA.</p>
+                    <h3>🎯 MODO SINGLEPLAYER</h3><p>Sobrevive a la horda. Usa <strong>WASD</strong> para moverte y las <strong>Flechas (↑ ↓ ← →)</strong> para disparar.</p>
+                    <button id="btn-close-info">ENTENDIDO</button>
+                </div>
+
+                <div id="config-panel" class="hidden">
+                    <div class="settings-grid">
+                        <div class="setting-item" id="wrap-hunters"><label>Nº Cazadores</label><input type="number" id="inp-hunters" value="4" min="1" max="50"></div>
+                        <div class="setting-item"><label>Daño Cazador</label><input type="number" id="inp-hunter-dmg" value="30" min="5" max="100"></div>
+                        <div class="setting-item" id="wrap-preys"><label>Nº Presas / Aliados</label><input type="number" id="inp-preys" value="4" min="1" max="50"></div>
+                        <div class="setting-item"><label>Daño Aliado / Disparo</label><input type="number" id="inp-prey-dmg" value="50" min="5" max="100"></div>
+                        <div class="setting-item" id="wrap-obstacles"><label>Obstáculos</label><input type="number" id="inp-obstacles" value="15" min="0" max="100"></div>
+                        <div class="setting-item"><label>Tamaño Tablero</label><input type="number" id="inp-size" value="20" min="10" max="50"></div>
+                    </div>
+                    <button id="start-btn">IR AL TABLERO</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <button id="reset-btn" class="hidden">VOLVER AL MENÚ</button>
+
+    <script type="module" src="/src/App.ts"></script>
+</body>
+</html>
