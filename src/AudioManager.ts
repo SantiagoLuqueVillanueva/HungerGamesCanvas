@@ -46,13 +46,13 @@ export class AudioManager {
         if (this.currentBgm === newBgm) return;
         this.stopBgm();
         this.currentBgm = newBgm;
-        this.currentBgm.play().catch(e => console.log("Esperando interacción para reproducir música..."));
+        this.currentBgm.play().catch(() => console.log("Esperando interacción para reproducir música..."));
     }
 
     private playClone(audio: HTMLAudioElement) {
         const clone = audio.cloneNode() as HTMLAudioElement;
         clone.volume = audio.volume;
-        clone.play().catch(e => {});
+        clone.play().catch(() => {});
     }
 }
 

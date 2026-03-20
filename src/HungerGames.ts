@@ -26,11 +26,9 @@ export class HungerGames {
     private projectiles: Projectile[] = [];
     private gameInterval: any = null;
     private projInterval: any = null;
-    private canvasId: string;
     public config: GameConfig;
 
     constructor(config: GameConfig, canvasId: string) {
-        this.canvasId = canvasId;
         this.config = config;
         this.board = new Board(config.size, config.size, canvasId);
         this.setupEntities();
@@ -39,7 +37,7 @@ export class HungerGames {
     private setupEntities(): void {
         this.hunters = [];
         this.preys = [];
-        
+
         if (this.config.mode === 'sandbox') return;
 
         const hStrat = new HunterMove();
@@ -93,7 +91,7 @@ export class HungerGames {
             const o = new Obstacle(`O${Date.now()}`, x, y);
             this.board.placePlayer(o);
         }
-        
+
         audioManager.playClick();
         this.board.drawBoard([], null);
     }
@@ -137,11 +135,11 @@ export class HungerGames {
 
     public start(): void {
         this.stop();
-        
+
         this.gameInterval = setInterval(() => {
             this.hunters.forEach(h => { if (this.isAlive(h)) h.performMove(this.board); });
-            this.preys.forEach((p, i) => { 
-                if (this.isAlive(p) && p.strategy) p.performMove(this.board); 
+            this.preys.forEach(p => {
+                if (this.isAlive(p) && p.strategy) p.performMove(this.board);
             });
             this.checkWinCondition();
         }, 400);
@@ -161,7 +159,7 @@ export class HungerGames {
                     const gridX = Math.floor(proj.x);
                     const gridY = Math.floor(proj.y);
                     const cell = this.board.getGrid()[gridY][gridX];
-                    
+
                     if (cell) {
                         if (cell.type === 'Hunter') {
                             audioManager.playHit();
@@ -179,8 +177,8 @@ export class HungerGames {
             }
 
             const playerChar = (this.config.mode === 'singleplayer' ? this.preys[0] : null);
-            this.board.drawBoard(this.projectiles, playerChar); 
-        }, 16); 
+            this.board.drawBoard(this.projectiles, playerChar);
+        }, 16);
     }
 
     private checkWinCondition() {
@@ -191,10 +189,10 @@ export class HungerGames {
             this.stop();
             const playerChar = (this.config.mode === 'singleplayer' ? this.preys[0] : null);
             this.board.drawBoard(this.projectiles, playerChar);
-            
+
             const playerWon = hAlive === 0;
             const msg = playerWon ? "¡VICTORIA DE LAS PRESAS!" : "¡LOS CAZADORES GANAN!";
-            
+
             window.dispatchEvent(new CustomEvent('game-over', { detail: { msg: msg, win: playerWon } }));
         }
     }
